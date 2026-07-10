@@ -12,6 +12,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid email format" },
+        { status: 400 }
+      );
+    }
+
+    if (typeof password !== "string" || password.length < 6) {
+      return NextResponse.json(
+        { success: false, error: "Invalid credentials" },
+        { status: 400 }
+      );
+    }
+
     const supabase = await createClient();
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -20,18 +34,24 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: "Invalid email or password" },
         { status: 401 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      data: { user: data.user, session: data.session },
+      data: {
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          user_metadata: data.user.user_metadata,
+        },
+      },
     });
   } catch {
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
+      { success: false, error: "An error occurred" },
       { status: 500 }
     );
   }

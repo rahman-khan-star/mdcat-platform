@@ -74,7 +74,6 @@ export async function updateProfile(
 
   const updateData: Record<string, unknown> = {};
   if (input.name !== undefined) updateData.full_name = input.name;
-  if (input.email !== undefined) updateData.email = input.email;
   if (input.phone !== undefined) updateData.phone = input.phone;
   if (input.city !== undefined) updateData.city = input.city;
   if (input.targetYear !== undefined) updateData.target_year = input.targetYear;

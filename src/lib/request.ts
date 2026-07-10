@@ -1,6 +1,10 @@
 import { NextRequest } from "next/server";
 import { AppError } from "./errors";
 
+export function sanitizeSearch(input: string): string {
+  return input.replace(/[(),|\\'"<>&]/g, "").trim().slice(0, 200);
+}
+
 export function parseSearchParams(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const params: Record<string, string> = {};

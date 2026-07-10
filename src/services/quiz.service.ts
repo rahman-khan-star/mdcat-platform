@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { NotFoundError } from "@/lib/errors";
+import { NotFoundError, ValidationError } from "@/lib/errors";
+import { sanitizeSearch } from "@/lib/validation";
 import type {
   Quiz,
   Question,
@@ -28,16 +29,6 @@ function mapQuiz(
   };
 }
 
-function mapQuestion(row: QuestionRow): Question {
-  return {
-    id: row.id,
-    question: row.question_text,
-    options: row.options as string[],
-    correctAnswer: row.correct_answer_index,
-    explanation: row.explanation,
-  };
-}
-
 export async function getAllQuizzes(
   filters: QuizFilters,
   userId?: string
@@ -54,9 +45,10 @@ export async function getAllQuizzes(
     .eq("is_active", true);
 
   if (filters.search) {
-    query = query.or(
-      `title.ilike.%${filters.search}%,subjects.name.ilike.%${filters.search}%`
-    );
+    const clean = sanitizeSearch(filters.search);
+    if (clean) {
+      query = query.ilike("title", `%${clean}%`);
+    }
   }
 
   if (filters.subject) {
@@ -70,7 +62,7 @@ export async function getAllQuizzes(
   query = query.order("created_at", { ascending: false }).range(from, to);
 
   const { data, error, count } = await query;
-  if (error) throw new Error(error.message);
+  if (error) throw new Error("Failed to fetch quizzes");
 
   let quizzes = (data ?? []).map(mapQuiz);
 
@@ -115,28 +107,8 @@ export async function getQuizById(id: string): Promise<Quiz> {
     .eq("id", id)
     .single();
 
-  if (error) throw new NotFoundError(`Quiz "${id}"`);
+  if (error) throw new NotFoundError("Quiz");
   return mapQuiz(data);
-}
-
-export async function getQuestionsByQuizId(quizId: string): Promise<Question[]> {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("quizzes")
-    .select("id")
-    .eq("id", quizId)
-    .single();
-
-  if (error) throw new NotFoundError(`Quiz "${quizId}"`);
-
-  const { data, error: qError } = await supabase
-    .from("questions")
-    .select("*")
-    .eq("quiz_id", quizId)
-    .order("sort_order", { ascending: true });
-
-  if (qError) throw new Error(qError.message);
-  return (data ?? []).map(mapQuestion);
 }
 
 export async function submitQuiz(
@@ -146,13 +118,33 @@ export async function submitQuiz(
 ): Promise<QuizResult> {
   const supabase = await createClient();
 
+  const { data: quiz, error: quizError } = await supabase
+    .from("quizzes")
+    .select("id, is_active, duration_minutes")
+    .eq("id", quizId)
+    .single();
+
+  if (quizError || !quiz) throw new NotFoundError("Quiz");
+
+  if (!quiz.is_active) {
+    throw new ValidationError("This quiz is not available");
+  }
+
   const { data: questions, error: qError } = await supabase
     .from("questions")
     .select("correct_answer_index")
     .eq("quiz_id", quizId)
     .order("sort_order", { ascending: true });
 
-  if (qError) throw new Error(qError.message);
+  if (qError) throw new Error("Failed to process quiz");
+
+  if (submission.answers.length !== questions.length) {
+    throw new ValidationError("Invalid submission: answer count mismatch");
+  }
+
+  if (submission.timeTaken > quiz.duration_minutes * 60 + 300) {
+    throw new ValidationError("Time limit exceeded");
+  }
 
   const correct = submission.answers.reduce((count, answer, i) => {
     return count + (answer === questions[i]?.correct_answer_index ? 1 : 0);
@@ -174,7 +166,7 @@ export async function submitQuiz(
       passed: score >= 60,
     });
 
-  if (insertError) throw new Error(insertError.message);
+  if (insertError) throw new Error("Failed to save submission");
 
   return {
     quizId,

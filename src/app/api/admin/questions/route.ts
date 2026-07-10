@@ -2,15 +2,15 @@ import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { successResponse, errorResponse, paginatedResponse } from "@/lib/api-response";
 import { AppError } from "@/lib/errors";
-import { parseSearchParams } from "@/lib/request";
+import { parseSearchParams, sanitizeSearch } from "@/lib/request";
 
 export async function GET(request: NextRequest) {
   try {
     const { supabase } = await requireAdmin();
     const searchParams = parseSearchParams(request);
-    const quizId = (searchParams.quiz_id as string) || "";
+    const quizId = String(searchParams.quiz_id || "").slice(0, 50);
     const page = Number(searchParams.page) || 1;
-    const limit = Number(searchParams.limit) || 50;
+    const limit = Math.min(Number(searchParams.limit) || 50, 100);
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, count, error } = await query.range(from, to);
-    if (error) throw new Error(error.message);
+    if (error) throw new Error("Failed to fetch questions");
 
     return paginatedResponse(data ?? [], count ?? 0, page, limit);
   } catch (error) {
@@ -54,22 +54,24 @@ export async function POST(request: NextRequest) {
       return errorResponse("correct_answer_index must be between 0 and 3", 400);
     }
 
+    const sanitizedOptions = options.map((opt: string) => String(opt).slice(0, 500));
+    const sanitizedQuestion = String(question_text).slice(0, 2000);
+
     const { data, error } = await supabase
       .from("questions")
       .insert({
-        quiz_id,
-        question_text,
-        options,
-        correct_answer_index,
-        explanation: explanation || "",
-        sort_order: sort_order || 0,
+        quiz_id: String(quiz_id).slice(0, 50),
+        question_text: sanitizedQuestion,
+        options: sanitizedOptions,
+        correct_answer_index: Number(correct_answer_index),
+        explanation: String(explanation || "").slice(0, 2000),
+        sort_order: Number(sort_order) || 0,
       })
       .select()
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error) throw new Error("Failed to create question");
 
-    // Update quiz question count
     const { count } = await supabase
       .from("questions")
       .select("*", { count: "exact", head: true })

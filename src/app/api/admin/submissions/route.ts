@@ -1,17 +1,17 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/admin";
-import { successResponse, errorResponse, paginatedResponse } from "@/lib/api-response";
+import { errorResponse, paginatedResponse } from "@/lib/api-response";
 import { AppError } from "@/lib/errors";
-import { parseSearchParams } from "@/lib/request";
+import { parseSearchParams, sanitizeSearch } from "@/lib/request";
 
 export async function GET(request: NextRequest) {
   try {
     const { supabase } = await requireAdmin();
     const searchParams = parseSearchParams(request);
-    const quizId = (searchParams.quiz_id as string) || "";
-    const userId = (searchParams.user_id as string) || "";
+    const quizId = String(searchParams.quiz_id || "").slice(0, 50);
+    const userId = String(searchParams.user_id || "").slice(0, 50);
     const page = Number(searchParams.page) || 1;
-    const limit = Number(searchParams.limit) || 20;
+    const limit = Math.min(Number(searchParams.limit) || 20, 50);
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, count, error } = await query.range(from, to);
-    if (error) throw new Error(error.message);
+    if (error) throw new Error("Failed to fetch submissions");
 
     return paginatedResponse(data ?? [], count ?? 0, page, limit);
   } catch (error) {

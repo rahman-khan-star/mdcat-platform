@@ -1,16 +1,16 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/admin";
-import { successResponse, errorResponse, paginatedResponse } from "@/lib/api-response";
+import { errorResponse, paginatedResponse } from "@/lib/api-response";
 import { AppError } from "@/lib/errors";
-import { parseSearchParams } from "@/lib/request";
+import { parseSearchParams, sanitizeSearch } from "@/lib/request";
 
 export async function GET(request: NextRequest) {
   try {
     const { supabase } = await requireAdmin();
     const searchParams = parseSearchParams(request);
-    const search = (searchParams.search as string) || "";
+    const search = sanitizeSearch(String(searchParams.search || ""));
     const page = Number(searchParams.page) || 1;
-    const limit = Number(searchParams.limit) || 20;
+    const limit = Math.min(Number(searchParams.limit) || 20, 50);
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -23,13 +23,12 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (search) {
-      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+      query = query.ilike("full_name", `%${search}%`);
     }
 
     const { data: profiles, count, error } = await query.range(from, to);
-    if (error) throw new Error(error.message);
+    if (error) throw new Error("Failed to fetch users");
 
-    // Get submission stats for each user
     const userIds = profiles?.map((p) => p.id) ?? [];
 
     const { data: submissionStats } = await supabase
