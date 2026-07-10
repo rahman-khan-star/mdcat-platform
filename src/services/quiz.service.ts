@@ -3,15 +3,14 @@ import { NotFoundError, ValidationError } from "@/lib/errors";
 import { sanitizeSearch } from "@/lib/validation";
 import type {
   Quiz,
-  Question,
   QuizFilters,
   QuizSubmission,
   QuizResult,
+  QuizResultQuestion,
 } from "@/types";
 
 type Database = import("@/types/supabase").Database;
 type QuizRow = Database["public"]["Tables"]["quizzes"]["Row"];
-type QuestionRow = Database["public"]["Tables"]["questions"]["Row"];
 
 function mapQuiz(
   row: QuizRow & { subjects?: { name: string } | null }
@@ -143,7 +142,7 @@ export async function submitQuiz(
 
   const { data: quiz, error: quizError } = await supabase
     .from("quizzes")
-    .select("id, is_active, duration_minutes")
+    .select("id, title, is_active, duration_minutes, subject_id, subjects!inner(name)")
     .eq("id", quizId)
     .single();
 
@@ -155,7 +154,7 @@ export async function submitQuiz(
 
   const { data: questions, error: qError } = await supabase
     .from("questions")
-    .select("correct_answer_index")
+    .select("id, question_text, options, correct_answer_index, explanation")
     .eq("quiz_id", quizId)
     .order("sort_order", { ascending: true });
 
@@ -169,9 +168,30 @@ export async function submitQuiz(
     throw new ValidationError("Time limit exceeded");
   }
 
-  const correct = submission.answers.reduce((count, answer, i) => {
-    return count + (answer === questions[i]?.correct_answer_index ? 1 : 0);
-  }, 0);
+  let correct = 0;
+  let wrong = 0;
+  let unattempted = 0;
+
+  const reviewQuestions: QuizResultQuestion[] = questions.map((q, i) => {
+    const selected = submission.answers[i];
+    const isUnattempted = selected === -1;
+    const isCorrect = !isUnattempted && selected === q.correct_answer_index;
+
+    if (isUnattempted) unattempted++;
+    else if (isCorrect) correct++;
+    else wrong++;
+
+    return {
+      id: q.id,
+      question: q.question_text,
+      options: q.options as string[],
+      correctAnswer: q.correct_answer_index,
+      explanation: q.explanation || "",
+      selectedAnswer: selected,
+      isCorrect,
+      isUnattempted,
+    };
+  });
 
   const total = questions.length;
   const score = total > 0 ? Math.round((correct / total) * 100) : 0;
@@ -193,10 +213,15 @@ export async function submitQuiz(
 
   return {
     quizId,
+    quizTitle: quiz.title,
+    subject: Array.isArray(quiz.subjects) ? quiz.subjects[0]?.name ?? "" : (quiz.subjects as { name: string } | null)?.name ?? "",
     score,
     correct,
+    wrong,
+    unattempted,
     total,
     timeTaken: submission.timeTaken,
     passed: score >= 60,
+    questions: reviewQuestions,
   };
 }

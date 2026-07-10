@@ -7,12 +7,17 @@ import { ChevronLeft, ChevronRight, Flag, Loader2 } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
 import QuestionCard from "@/components/QuestionCard";
 import { LoadingState, ErrorState } from "@/components/DataStates";
-import type { Question } from "@/types";
 
 interface QuizMeta {
   id: string;
   title: string;
   duration: number;
+}
+
+interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
 }
 
 export default function QuizPage() {
@@ -21,13 +26,12 @@ export default function QuizPage() {
   const quizId = params.id as string;
 
   const [quiz, setQuiz] = useState<QuizMeta | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
-  const [showResult, setShowResult] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -93,9 +97,15 @@ export default function QuizPage() {
 
         setSubmitted(true);
         const result = data.data;
-        router.push(
-          `/results?score=${result.score}&correct=${result.correct}&total=${result.total}&quizId=${quizId}&time=${timeTaken}`
+        sessionStorage.setItem(
+          `quiz-review-${quizId}`,
+          JSON.stringify({
+            ...result,
+            answers: answerArray,
+            questions: questions,
+          })
         );
+        router.push(`/results?quizId=${quizId}`);
       } catch (err) {
         hasSubmittedRef.current = false;
         setIsSubmitting(false);
@@ -104,7 +114,7 @@ export default function QuizPage() {
         );
       }
     },
-    [quizId, isSubmitting, submitted, router]
+    [quizId, isSubmitting, submitted, questions, router]
   );
 
   const handleTimeUp = useCallback(() => {
@@ -117,24 +127,21 @@ export default function QuizPage() {
 
   const handleAnswer = useCallback(
     (index: number) => {
-      if (showResult || isSubmitting) return;
+      if (isSubmitting) return;
       const newAnswers = [...answers];
       newAnswers[currentIndex] = index;
       setAnswers(newAnswers);
-      setShowResult(true);
     },
-    [answers, currentIndex, showResult, isSubmitting]
+    [answers, currentIndex, isSubmitting]
   );
 
   const handleNext = () => {
-    setShowResult(false);
     if (currentIndex < totalQuestions - 1) {
       setCurrentIndex(currentIndex + 1);
     }
   };
 
   const handlePrev = () => {
-    setShowResult(false);
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
     }
@@ -208,7 +215,7 @@ export default function QuizPage() {
               {quiz!.title}
             </h1>
             <p className="mt-1 text-sm text-text-secondary">
-              {answeredCount}/{totalQuestions} questions answered
+              {answeredCount}/{totalQuestions} answered
             </p>
           </div>
           <CountdownTimer duration={quiz!.duration} onTimeUp={handleTimeUp} />
@@ -234,7 +241,6 @@ export default function QuizPage() {
             totalQuestions={totalQuestions}
             onAnswer={handleAnswer}
             selectedAnswer={answers[currentIndex]}
-            showResult={showResult}
           />
         </div>
 
@@ -256,7 +262,7 @@ export default function QuizPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary-dark hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50"
               >
                 <Flag className="h-4 w-4" />
-                Finish Quiz
+                Submit Quiz
               </button>
             ) : (
               <button
@@ -275,10 +281,7 @@ export default function QuizPage() {
           {questions.map((_, i) => (
             <button
               key={i}
-              onClick={() => {
-                setShowResult(false);
-                setCurrentIndex(i);
-              }}
+              onClick={() => setCurrentIndex(i)}
               disabled={isSubmitting}
               className={`h-8 w-8 rounded-lg text-xs font-medium transition-all ${
                 i === currentIndex

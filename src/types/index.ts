@@ -102,11 +102,27 @@ export interface QuizSubmission {
 
 export interface QuizResult {
   quizId: string;
+  quizTitle: string;
+  subject: string;
   score: number;
   correct: number;
+  wrong: number;
+  unattempted: number;
   total: number;
   timeTaken: number;
   passed: boolean;
+  questions: QuizResultQuestion[];
+}
+
+export interface QuizResultQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation: string;
+  selectedAnswer: number;
+  isCorrect: boolean;
+  isUnattempted: boolean;
 }
 
 export interface ApiResponse<T = unknown> {
