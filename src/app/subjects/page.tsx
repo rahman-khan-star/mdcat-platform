@@ -1,13 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import SubjectCard from "@/components/SubjectCard";
 import SearchBar from "@/components/SearchBar";
-import { subjects } from "@/data/mockData";
+import { LoadingState, ErrorState, EmptyState } from "@/components/DataStates";
 import { motion } from "framer-motion";
+import type { Subject } from "@/types";
 
 export default function SubjectsPage() {
   const [search, setSearch] = useState("");
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchSubjects = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/subjects");
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setSubjects(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load subjects");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubjects();
+  }, []);
 
   const filtered = subjects.filter(
     (s) =>
@@ -39,17 +62,18 @@ export default function SubjectsPage() {
           />
         </div>
 
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((subject, i) => (
-            <SubjectCard key={subject.id} subject={subject} index={i} />
-          ))}
-        </div>
+        {isLoading && <LoadingState message="Loading subjects..." />}
+        {error && <ErrorState message={error} onRetry={fetchSubjects} />}
 
-        {filtered.length === 0 && (
-          <div className="mt-16 text-center">
-            <p className="text-lg text-text-secondary">
-              No subjects found matching your search.
-            </p>
+        {!isLoading && !error && filtered.length === 0 && (
+          <EmptyState message="No subjects found matching your search." />
+        )}
+
+        {!isLoading && !error && filtered.length > 0 && (
+          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((subject, i) => (
+              <SubjectCard key={subject.id} subject={subject} index={i} />
+            ))}
           </div>
         )}
       </div>

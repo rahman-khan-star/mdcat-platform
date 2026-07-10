@@ -1,23 +1,68 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Flag, SkipForward } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flag } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
 import QuestionCard from "@/components/QuestionCard";
-import { sampleQuestions } from "@/data/mockData";
+import { LoadingState, ErrorState } from "@/components/DataStates";
+import type { Question } from "@/types";
+
+interface QuizMeta {
+  id: string;
+  title: string;
+  duration: number;
+}
 
 export default function QuizPage() {
   const router = useRouter();
+  const params = useParams();
+  const quizId = params.id as string;
+
+  const [quiz, setQuiz] = useState<QuizMeta | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(
-    new Array(sampleQuestions.length).fill(null)
-  );
+  const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [showResult, setShowResult] = useState(false);
 
-  const currentQuestion = sampleQuestions[currentIndex];
-  const totalQuestions = sampleQuestions.length;
+  const fetchQuiz = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [quizRes, questionsRes] = await Promise.all([
+        fetch(`/api/quizzes/${quizId}`),
+        fetch(`/api/quizzes/${quizId}/questions`),
+      ]);
+      const quizJson = await quizRes.json();
+      const questionsJson = await questionsRes.json();
+
+      if (!quizJson.success) throw new Error(quizJson.error);
+      if (!questionsJson.success) throw new Error(questionsJson.error);
+
+      setQuiz({
+        id: quizJson.data.id,
+        title: quizJson.data.title,
+        duration: quizJson.data.duration,
+      });
+      setQuestions(questionsJson.data);
+      setAnswers(new Array(questionsJson.data.length).fill(null));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load quiz");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [quizId]);
+
+  useEffect(() => {
+    fetchQuiz();
+  }, [fetchQuiz]);
+
+  const currentQuestion = questions[currentIndex];
+  const totalQuestions = questions.length;
   const answeredCount = answers.filter((a) => a !== null).length;
 
   const handleAnswer = useCallback(
@@ -47,17 +92,33 @@ export default function QuizPage() {
 
   const handleFinish = () => {
     const correct = answers.reduce<number>((count, answer, i) => {
-      return count + (answer === sampleQuestions[i].correctAnswer ? 1 : 0);
+      return count + (answer === questions[i]?.correctAnswer ? 1 : 0);
     }, 0);
-    const score = Math.round((correct / totalQuestions) * 100);
+    const score = totalQuestions > 0 ? Math.round((correct / totalQuestions) * 100) : 0;
     router.push(
-      `/results?score=${score}&correct=${correct}&total=${totalQuestions}`
+      `/results?score=${score}&correct=${correct}&total=${totalQuestions}&quizId=${quizId}`
     );
   };
 
-  const handleTimeUp = () => {
-    handleFinish();
-  };
+  if (isLoading) {
+    return (
+      <div className="pt-24 pb-16">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <LoadingState message="Loading quiz..." />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !quiz || questions.length === 0) {
+    return (
+      <div className="pt-24 pb-16">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <ErrorState message={error ?? "Quiz not found"} onRetry={fetchQuiz} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pt-24 pb-16">
@@ -69,13 +130,13 @@ export default function QuizPage() {
         >
           <div>
             <h1 className="text-xl font-bold text-text-primary sm:text-2xl">
-              Cell Biology Basics
+              {quiz.title}
             </h1>
             <p className="mt-1 text-sm text-text-secondary">
               {answeredCount}/{totalQuestions} questions answered
             </p>
           </div>
-          <CountdownTimer duration={30} onTimeUp={handleTimeUp} />
+          <CountdownTimer duration={quiz.duration} onTimeUp={handleFinish} />
         </motion.div>
 
         <div className="mt-4">
@@ -134,7 +195,7 @@ export default function QuizPage() {
         </div>
 
         <div className="mt-8 flex flex-wrap gap-2">
-          {sampleQuestions.map((_, i) => (
+          {questions.map((_, i) => (
             <button
               key={i}
               onClick={() => {

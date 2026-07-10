@@ -11,6 +11,7 @@ function ResultsContent() {
   const score = Number(searchParams.get("score")) || 0;
   const correct = Number(searchParams.get("correct")) || 0;
   const total = Number(searchParams.get("total")) || 30;
+  const quizId = searchParams.get("quizId") || "1";
   const incorrect = total - correct;
 
   const getMessage = () => {
@@ -81,7 +82,7 @@ function ResultsContent() {
           className="mt-6 flex flex-col gap-3"
         >
           <Link
-            href="/quiz/1"
+            href={`/quiz/${quizId}`}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-white px-6 py-3 text-sm font-semibold text-text-primary transition-all hover:bg-surface-hover"
           >
             <RotateCcw className="h-4 w-4" />

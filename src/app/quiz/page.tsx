@@ -1,16 +1,46 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import QuizCard from "@/components/QuizCard";
 import SearchBar from "@/components/SearchBar";
-import { quizzes, subjects } from "@/data/mockData";
+import { LoadingState, ErrorState, EmptyState } from "@/components/DataStates";
 import { motion } from "framer-motion";
 import { Filter } from "lucide-react";
+import type { Quiz, Subject } from "@/types";
 
 export default function QuizListPage() {
   const [search, setSearch] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("all");
   const [selectedDifficulty, setSelectedDifficulty] = useState("all");
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [quizRes, subjectRes] = await Promise.all([
+        fetch("/api/quizzes?limit=50"),
+        fetch("/api/subjects"),
+      ]);
+      const quizJson = await quizRes.json();
+      const subjectJson = await subjectRes.json();
+      if (!quizJson.success) throw new Error(quizJson.error);
+      if (!subjectJson.success) throw new Error(subjectJson.error);
+      setQuizzes(quizJson.data);
+      setSubjects(subjectJson.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load quizzes");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const filtered = useMemo(() => {
     return quizzes.filter((q) => {
@@ -23,7 +53,7 @@ export default function QuizListPage() {
         selectedDifficulty === "all" || q.difficulty === selectedDifficulty;
       return matchesSearch && matchesSubject && matchesDifficulty;
     });
-  }, [search, selectedSubject, selectedDifficulty]);
+  }, [quizzes, search, selectedSubject, selectedDifficulty]);
 
   return (
     <div className="pt-24 pb-16">
@@ -37,7 +67,9 @@ export default function QuizListPage() {
             Quiz Library
           </h1>
           <p className="mt-2 text-text-secondary">
-            Choose from {quizzes.length} practice quizzes across all subjects
+            {isLoading
+              ? "Loading quizzes..."
+              : `Choose from ${quizzes.length} practice quizzes across all subjects`}
           </p>
         </motion.div>
 
@@ -78,21 +110,24 @@ export default function QuizListPage() {
           </div>
         </div>
 
-        <div className="mt-2 text-sm text-text-muted">
-          Showing {filtered.length} of {quizzes.length} quizzes
-        </div>
+        {!isLoading && !error && (
+          <div className="mt-2 text-sm text-text-muted">
+            Showing {filtered.length} of {quizzes.length} quizzes
+          </div>
+        )}
 
-        <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((quiz, i) => (
-            <QuizCard key={quiz.id} quiz={quiz} index={i} />
-          ))}
-        </div>
+        {isLoading && <LoadingState message="Loading quizzes..." />}
+        {error && <ErrorState message={error} onRetry={fetchData} />}
 
-        {filtered.length === 0 && (
-          <div className="mt-16 text-center">
-            <p className="text-lg text-text-secondary">
-              No quizzes found matching your filters.
-            </p>
+        {!isLoading && !error && filtered.length === 0 && (
+          <EmptyState message="No quizzes found matching your filters." />
+        )}
+
+        {!isLoading && !error && filtered.length > 0 && (
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((quiz, i) => (
+              <QuizCard key={quiz.id} quiz={quiz} index={i} />
+            ))}
           </div>
         )}
       </div>
