@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Flag } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, ChevronRight, Flag, Loader2 } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
 import QuestionCard from "@/components/QuestionCard";
 import { LoadingState, ErrorState } from "@/components/DataStates";
@@ -29,6 +29,11 @@ export default function QuizPage() {
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [showResult, setShowResult] = useState(false);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const startTimeRef = useRef<number>(Date.now());
+  const hasSubmittedRef = useRef(false);
+
   const fetchQuiz = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -50,6 +55,7 @@ export default function QuizPage() {
       });
       setQuestions(questionsJson.data);
       setAnswers(new Array(questionsJson.data.length).fill(null));
+      startTimeRef.current = Date.now();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load quiz");
     } finally {
@@ -61,19 +67,63 @@ export default function QuizPage() {
     fetchQuiz();
   }, [fetchQuiz]);
 
+  const submitQuiz = useCallback(
+    async (finalAnswers: (number | null)[]) => {
+      if (hasSubmittedRef.current || isSubmitting || submitted) return;
+      hasSubmittedRef.current = true;
+      setIsSubmitting(true);
+
+      const timeTaken = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      const answerArray = finalAnswers.map((a) => (a === null ? -1 : a));
+
+      try {
+        const res = await fetch(`/api/quizzes/${quizId}/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            answers: answerArray,
+            timeTaken,
+          }),
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+          throw new Error(data.error || "Failed to submit quiz");
+        }
+
+        setSubmitted(true);
+        const result = data.data;
+        router.push(
+          `/results?score=${result.score}&correct=${result.correct}&total=${result.total}&quizId=${quizId}&time=${timeTaken}`
+        );
+      } catch (err) {
+        hasSubmittedRef.current = false;
+        setIsSubmitting(false);
+        setError(
+          err instanceof Error ? err.message : "Failed to submit quiz. Please try again."
+        );
+      }
+    },
+    [quizId, isSubmitting, submitted, router]
+  );
+
+  const handleTimeUp = useCallback(() => {
+    submitQuiz(answers);
+  }, [answers, submitQuiz]);
+
   const currentQuestion = questions[currentIndex];
   const totalQuestions = questions.length;
   const answeredCount = answers.filter((a) => a !== null).length;
 
   const handleAnswer = useCallback(
     (index: number) => {
-      if (showResult) return;
+      if (showResult || isSubmitting) return;
       const newAnswers = [...answers];
       newAnswers[currentIndex] = index;
       setAnswers(newAnswers);
       setShowResult(true);
     },
-    [answers, currentIndex, showResult]
+    [answers, currentIndex, showResult, isSubmitting]
   );
 
   const handleNext = () => {
@@ -91,13 +141,7 @@ export default function QuizPage() {
   };
 
   const handleFinish = () => {
-    const correct = answers.reduce<number>((count, answer, i) => {
-      return count + (answer === questions[i]?.correctAnswer ? 1 : 0);
-    }, 0);
-    const score = totalQuestions > 0 ? Math.round((correct / totalQuestions) * 100) : 0;
-    router.push(
-      `/results?score=${score}&correct=${correct}&total=${totalQuestions}&quizId=${quizId}`
-    );
+    submitQuiz(answers);
   };
 
   if (isLoading) {
@@ -110,7 +154,7 @@ export default function QuizPage() {
     );
   }
 
-  if (error || !quiz || questions.length === 0) {
+  if (error && !quiz) {
     return (
       <div className="pt-24 pb-16">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
@@ -123,6 +167,37 @@ export default function QuizPage() {
   return (
     <div className="pt-24 pb-16">
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
+        <AnimatePresence>
+          {isSubmitting && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                className="rounded-2xl bg-white p-8 shadow-2xl text-center"
+              >
+                <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto" />
+                <p className="mt-4 text-lg font-semibold text-text-primary">
+                  Submitting your answers...
+                </p>
+                <p className="mt-1 text-sm text-text-secondary">
+                  Please don&apos;t close this page
+                </p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {error && (
+          <div className="mb-4 rounded-xl border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
+            {error}
+          </div>
+        )}
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -130,13 +205,13 @@ export default function QuizPage() {
         >
           <div>
             <h1 className="text-xl font-bold text-text-primary sm:text-2xl">
-              {quiz.title}
+              {quiz!.title}
             </h1>
             <p className="mt-1 text-sm text-text-secondary">
               {answeredCount}/{totalQuestions} questions answered
             </p>
           </div>
-          <CountdownTimer duration={quiz.duration} onTimeUp={handleFinish} />
+          <CountdownTimer duration={quiz!.duration} onTimeUp={handleTimeUp} />
         </motion.div>
 
         <div className="mt-4">
@@ -166,7 +241,7 @@ export default function QuizPage() {
         <div className="mt-6 flex items-center justify-between">
           <button
             onClick={handlePrev}
-            disabled={currentIndex === 0}
+            disabled={currentIndex === 0 || isSubmitting}
             className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-5 py-2.5 text-sm font-medium text-text-secondary transition-all hover:bg-surface-hover disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -177,7 +252,8 @@ export default function QuizPage() {
             {currentIndex === totalQuestions - 1 ? (
               <button
                 onClick={handleFinish}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary-dark hover:shadow-xl hover:-translate-y-0.5"
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary-dark hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50"
               >
                 <Flag className="h-4 w-4" />
                 Finish Quiz
@@ -185,7 +261,8 @@ export default function QuizPage() {
             ) : (
               <button
                 onClick={handleNext}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary-dark hover:shadow-xl hover:-translate-y-0.5"
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary-dark hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50"
               >
                 Next
                 <ChevronRight className="h-4 w-4" />
@@ -202,6 +279,7 @@ export default function QuizPage() {
                 setShowResult(false);
                 setCurrentIndex(i);
               }}
+              disabled={isSubmitting}
               className={`h-8 w-8 rounded-lg text-xs font-medium transition-all ${
                 i === currentIndex
                   ? "bg-primary text-white shadow-md"

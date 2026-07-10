@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Trophy, CheckCircle2, XCircle, RotateCcw, Home, ArrowRight } from "lucide-react";
+import { Trophy, CheckCircle2, XCircle, RotateCcw, Home, ArrowRight, Clock } from "lucide-react";
 
 function ResultsContent() {
   const searchParams = useSearchParams();
@@ -12,7 +12,10 @@ function ResultsContent() {
   const correct = Number(searchParams.get("correct")) || 0;
   const total = Number(searchParams.get("total")) || 30;
   const quizId = searchParams.get("quizId") || "1";
+  const timeTaken = Number(searchParams.get("time")) || 0;
   const incorrect = total - correct;
+  const timeMinutes = Math.floor(timeTaken / 60);
+  const timeSeconds = timeTaken % 60;
 
   const getMessage = () => {
     if (score >= 90) return { title: "Excellent!", desc: "Outstanding performance! You're ready for the real exam.", color: "text-secondary" };
@@ -56,7 +59,7 @@ function ResultsContent() {
             <p className="mt-1 text-5xl font-bold text-text-primary">{score}%</p>
           </div>
 
-          <div className="mt-6 grid grid-cols-3 gap-4">
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div className="rounded-xl bg-surface p-4 text-center">
               <CheckCircle2 className="mx-auto h-5 w-5 text-secondary" />
               <p className="mt-2 text-xl font-bold text-secondary">{correct}</p>
@@ -71,6 +74,13 @@ function ResultsContent() {
               <Trophy className="mx-auto h-5 w-5 text-warning" />
               <p className="mt-2 text-xl font-bold text-warning">{total}</p>
               <p className="text-xs text-text-muted">Total</p>
+            </div>
+            <div className="rounded-xl bg-surface p-4 text-center">
+              <Clock className="mx-auto h-5 w-5 text-primary" />
+              <p className="mt-2 text-xl font-bold text-primary">
+                {timeMinutes}:{String(timeSeconds).padStart(2, "0")}
+              </p>
+              <p className="text-xs text-text-muted">Time Taken</p>
             </div>
           </div>
         </motion.div>
