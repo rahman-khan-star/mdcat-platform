@@ -99,16 +99,39 @@ export async function getAllQuizzes(
   return { quizzes, total: count ?? 0 };
 }
 
-export async function getQuizById(id: string): Promise<Quiz> {
+export async function getQuizById(id: string, userId?: string): Promise<Quiz> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("quizzes")
     .select("*, subjects!inner(name)")
     .eq("id", id)
+    .eq("is_active", true)
     .single();
 
   if (error) throw new NotFoundError("Quiz");
-  return mapQuiz(data);
+
+  let quiz = mapQuiz(data);
+
+  if (userId) {
+    const { data: submissions } = await supabase
+      .from("quiz_submissions")
+      .select("score")
+      .eq("user_id", userId)
+      .eq("quiz_id", id);
+
+    if (submissions && submissions.length > 0) {
+      const best = Math.max(...submissions.map((s) => s.score));
+      quiz = {
+        ...quiz,
+        attempted: true,
+        score: best,
+        bestScore: best,
+        attempts: submissions.length,
+      };
+    }
+  }
+
+  return quiz;
 }
 
 export async function submitQuiz(

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NotFoundError } from "@/lib/errors";
+import { sanitizeSearch } from "@/lib/validation";
 import type { Subject } from "@/types";
 
 function mapSubject(row: Database["public"]["Tables"]["subjects"]["Row"]): Subject {
@@ -40,13 +41,16 @@ export async function getSubjectById(id: string): Promise<Subject> {
 }
 
 export async function searchSubjects(query: string): Promise<Subject[]> {
+  const clean = sanitizeSearch(query);
+  if (!clean) return [];
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("subjects")
     .select("*")
-    .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+    .or(`name.ilike.%${clean}%,description.ilike.%${clean}%`)
     .order("sort_order", { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error("Failed to search subjects");
   return (data ?? []).map(mapSubject);
 }
