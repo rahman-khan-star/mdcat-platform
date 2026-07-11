@@ -16,6 +16,8 @@ import {
   X,
   GraduationCap,
   ChevronLeft,
+  Upload,
+  FileText,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,7 +25,10 @@ const sidebarLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/subjects", label: "Subjects", icon: BookOpen },
   { href: "/admin/quizzes", label: "Quizzes", icon: FileQuestion },
+  { href: "/admin/quizzes/create", label: "Bulk Create Quiz", icon: FileQuestion },
   { href: "/admin/questions", label: "Questions", icon: HelpCircle },
+  { href: "/admin/upload", label: "Bulk Upload", icon: Upload },
+  { href: "/admin/past-papers", label: "Past Papers", icon: FileText },
   { href: "/admin/submissions", label: "Submissions", icon: ClipboardList },
   { href: "/admin/users", label: "Users", icon: Users },
 ];
