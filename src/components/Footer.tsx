@@ -40,9 +40,9 @@ export default function Footer() {
               Your comprehensive platform for MDCAT preparation with practice quizzes, progress tracking, and more.
             </p>
             <div className="mt-6 space-y-2">
-              <a href="mailto:free10fireislamia@gmail.com" className="flex items-center gap-2 text-sm text-text-secondary hover:text-primary transition-colors">
+              <a href="mailto:mdcatproonly@gmail.com" className="flex items-center gap-2 text-sm text-text-secondary hover:text-primary transition-colors">
                 <Mail className="h-4 w-4" />
-                free10fireislamia@gmail.com
+                mdcatproonly@gmail.com
               </a>
               <a href="tel:+923429005290" className="flex items-center gap-2 text-sm text-text-secondary hover:text-primary transition-colors">
                 <Phone className="h-4 w-4" />
