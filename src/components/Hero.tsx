@@ -13,10 +13,10 @@ const features = [
 
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-white to-secondary/5 pt-24 pb-16 sm:pt-32 sm:pb-24">
+    <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-white to-secondary/5 pt-24 pb-16 sm:pt-32 sm:pb-24 dark:from-primary/10 dark:via-slate-900 dark:to-secondary/10">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-secondary/10 blur-3xl" />
+        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/10 blur-3xl dark:bg-primary/20" />
+        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-secondary/10 blur-3xl dark:bg-secondary/20" />
       </div>
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -72,7 +72,7 @@ export default function Hero() {
             </Link>
             <Link
               href="/subjects"
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-7 py-3.5 text-sm font-semibold text-text-primary transition-all hover:bg-surface-hover hover:-translate-y-0.5"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-7 py-3.5 text-sm font-semibold text-text-primary transition-all hover:bg-surface-hover hover:-translate-y-0.5 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
             >
               Explore Subjects
             </Link>
@@ -91,7 +91,7 @@ export default function Hero() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.5 + i * 0.1 }}
-              className="group rounded-2xl border border-border bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1"
+              className="group rounded-2xl border border-border bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:bg-slate-800 dark:border-slate-700"
             >
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
                 <feature.icon className="h-5 w-5" />
