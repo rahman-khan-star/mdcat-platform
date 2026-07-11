@@ -31,11 +31,22 @@ body {
   background: #ffffff;
   color: #0f172a;
   font-family: "Inter", system-ui, sans-serif;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.dark body,
+body.dark {
+  background: #0f172a;
+  color: #f1f5f9;
 }
 
 * {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
+}
+
+.dark * {
+  scrollbar-color: #475569 transparent;
 }
 
 ::selection {
@@ -84,3 +95,17 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* Dark mode overrides */
+.dark .bg-white { background-color: #1e293b !important; }
+.dark .bg-surface { background-color: #0f172a !important; }
+.dark .bg-surface-hover { background-color: #1e293b !important; }
+.dark .border-border { border-color: #334155 !important; }
+.dark .text-text-primary { color: #f1f5f9 !important; }
+.dark .text-text-secondary { color: #94a3b8 !important; }
+.dark .text-text-muted { color: #64748b !important; }
+.dark .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0,0,0,0.3) !important; }
+.dark .shadow-md { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.4) !important; }
+.dark .hover\:bg-surface-hover:hover { background-color: #1e293b !important; }
+.dark .hover\:bg-white:hover { background-color: #1e293b !important; }
+.dark input, .dark textarea, .dark select { background-color: #1e293b !important; border-color: #334155 !important; color: #f1f5f9 !important; }

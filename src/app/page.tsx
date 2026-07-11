@@ -90,12 +90,12 @@ export default async function Home() {
               { icon: Flame, label: "Study Streak", value: "12 days", color: "#f59e0b" },
               { icon: Award, label: "Top Rank", value: "#15", color: "#8b5cf6" },
             ].map((stat) => (
-              <div key={stat.label} className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm">
+              <div key={stat.label} className="group flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-default">
                 <div
-                  className="flex h-12 w-12 items-center justify-center rounded-xl"
+                  className="flex h-12 w-12 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110"
                   style={{ backgroundColor: `${stat.color}15` }}
                 >
-                  <stat.icon className="h-6 w-6" style={{ color: stat.color }} />
+                  <stat.icon className="h-6 w-6 transition-colors duration-300" style={{ color: stat.color }} />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-text-primary">{stat.value}</p>

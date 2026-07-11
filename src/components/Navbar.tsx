@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, GraduationCap, LogOut, Shield } from "lucide-react";
+import { Menu, X, GraduationCap, LogOut, Shield, Sun, Moon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -22,6 +22,7 @@ export default function Navbar() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDark, setIsDark] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -68,6 +69,14 @@ export default function Navbar() {
   }, [supabase]);
 
   useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const shouldBeDark = saved === "dark" || (!saved && prefersDark);
+    setIsDark(shouldBeDark);
+    document.documentElement.classList.toggle("dark", shouldBeDark);
+  }, []);
+
+  useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
@@ -76,6 +85,13 @@ export default function Navbar() {
   useEffect(() => {
     setIsOpen(false);
   }, [pathname]);
+
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -137,6 +153,13 @@ export default function Navbar() {
         </div>
 
         <div className="hidden md:flex items-center gap-3">
+          <button
+            onClick={toggleTheme}
+            className="flex items-center justify-center rounded-xl p-2 text-text-secondary transition-colors hover:bg-surface-hover"
+            title={isDark ? "Light mode" : "Dark mode"}
+          >
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           {isLoading ? (
             <div className="h-9 w-20 animate-pulse rounded-xl bg-surface" />
           ) : user ? (
@@ -219,6 +242,13 @@ export default function Navbar() {
               ))}
 
               <div className="border-t border-border pt-3 mt-3">
+                <button
+                  onClick={toggleTheme}
+                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-text-secondary hover:bg-surface-hover"
+                >
+                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  {isDark ? "Light Mode" : "Dark Mode"}
+                </button>
                 {isLoading ? (
                   <div className="h-10 animate-pulse rounded-xl bg-surface" />
                 ) : user ? (
