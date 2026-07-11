@@ -12,15 +12,12 @@ import {
   MinusCircle,
   RotateCcw,
   Home,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Target,
   BookOpen,
   AlertTriangle,
   Bookmark,
   BookmarkCheck,
-  Hash,
 } from "lucide-react";
 
 interface ReviewQuestion {
@@ -54,7 +51,6 @@ function ResultsContent() {
   const quizId = searchParams.get("quizId") || "";
 
   const [reviewData, setReviewData] = useState<ReviewData | null>(null);
-  const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
   const [showOnlyBookmarks, setShowOnlyBookmarks] = useState(false);
 
@@ -131,8 +127,6 @@ function ResultsContent() {
   const filteredQuestions = showOnlyBookmarks
     ? questions.map((q, i) => ({ ...q, originalIndex: i })).filter((q) => bookmarks.has(q.originalIndex))
     : questions.map((q, i) => ({ ...q, originalIndex: i }));
-
-  const currentQ = filteredQuestions[currentReviewIndex];
 
   const getPerformanceMessage = () => {
     if (score >= 90)
@@ -325,10 +319,7 @@ function ResultsContent() {
               Question Review
             </h3>
             <button
-              onClick={() => {
-                setShowOnlyBookmarks(!showOnlyBookmarks);
-                setCurrentReviewIndex(0);
-              }}
+              onClick={() => setShowOnlyBookmarks(!showOnlyBookmarks)}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
                 showOnlyBookmarks
                   ? "bg-warning/10 text-warning"
@@ -354,175 +345,110 @@ function ResultsContent() {
               </p>
             </div>
           ) : (
-            <>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {filteredQuestions.map((q, i) => (
-                  <button
-                    key={q.originalIndex}
-                    onClick={() => setCurrentReviewIndex(i)}
-                    className={`h-8 w-8 rounded-lg text-xs font-medium transition-all ${
-                      i === currentReviewIndex
-                        ? "bg-primary text-white shadow-md"
-                        : q.isCorrect
-                        ? "bg-secondary/10 text-secondary"
-                        : q.isUnattempted
-                        ? "bg-surface text-text-muted"
-                        : "bg-danger/10 text-danger"
-                    }`}
-                  >
-                    {q.originalIndex + 1}
-                  </button>
-                ))}
-              </div>
-
-              {currentQ && (
+            <div className="mt-4 space-y-4">
+              {filteredQuestions.map((q, i) => (
                 <motion.div
-                  key={currentQ.originalIndex}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="mt-4 rounded-2xl border border-border bg-white p-6 shadow-sm"
+                  key={q.originalIndex}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                  className={`rounded-2xl border-2 bg-white p-5 shadow-sm ${
+                    q.isCorrect
+                      ? "border-emerald-200"
+                      : q.isUnattempted
+                      ? "border-border"
+                      : "border-rose-200"
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                        <Hash className="h-3 w-3" />
-                        {currentQ.originalIndex + 1}/{total}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                          currentQ.isCorrect
-                            ? "bg-secondary/10 text-secondary"
-                            : currentQ.isUnattempted
-                            ? "bg-surface text-text-muted"
-                            : "bg-danger/10 text-danger"
-                        }`}
-                      >
-                        {currentQ.isCorrect
-                          ? "Correct"
-                          : currentQ.isUnattempted
-                          ? "Unattempted"
-                          : "Wrong"}
-                      </span>
-                    </div>
+                  <div className="flex items-start gap-3 mb-4">
+                    {q.isCorrect ? (
+                      <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500 mt-0.5" />
+                    ) : q.isUnattempted ? (
+                      <MinusCircle className="h-5 w-5 shrink-0 text-text-muted mt-0.5" />
+                    ) : (
+                      <XCircle className="h-5 w-5 shrink-0 text-rose-500 mt-0.5" />
+                    )}
+                    <h4 className="text-sm font-semibold text-text-primary leading-relaxed">
+                      {i + 1}. {q.question}
+                    </h4>
                     <button
-                      onClick={() => toggleBookmark(currentQ.originalIndex)}
-                      className="rounded-lg p-1.5 transition-colors hover:bg-surface"
+                      onClick={() => toggleBookmark(q.originalIndex)}
+                      className="shrink-0 rounded-lg p-1 transition-colors hover:bg-surface"
                     >
-                      {bookmarks.has(currentQ.originalIndex) ? (
-                        <BookmarkCheck className="h-5 w-5 text-warning" />
+                      {bookmarks.has(q.originalIndex) ? (
+                        <BookmarkCheck className="h-4 w-4 text-warning" />
                       ) : (
-                        <Bookmark className="h-5 w-5 text-text-muted" />
+                        <Bookmark className="h-4 w-4 text-text-muted" />
                       )}
                     </button>
                   </div>
 
-                  <h4 className="mt-4 text-base font-medium leading-relaxed text-text-primary">
-                    {currentQ.question}
-                  </h4>
-
-                  <div className="mt-4 space-y-2">
-                    {currentQ.options.map((option, i) => {
-                      const isCorrectAnswer = i === currentQ.correctAnswer;
-                      const isStudentAnswer = i === currentQ.selectedAnswer;
-
-                      let style =
-                        "border-border bg-white";
-                      if (isCorrectAnswer) {
-                        style = "border-secondary bg-secondary/5";
-                      } else if (isStudentAnswer && !isCorrectAnswer) {
-                        style = "border-danger bg-danger/5";
-                      }
+                  <div className="ml-8 space-y-1.5">
+                    {q.options.map((option, j) => {
+                      const isCorrect = j === q.correctAnswer;
+                      const isSelected = j === q.selectedAnswer;
 
                       return (
                         <div
-                          key={i}
-                          className={`flex items-start gap-3 rounded-xl border-2 p-3 ${style}`}
+                          key={j}
+                          className={`flex items-center justify-between rounded-xl px-4 py-2.5 text-sm ${
+                            isCorrect
+                              ? "bg-emerald-50 border border-emerald-200"
+                              : isSelected && !isCorrect
+                              ? "bg-rose-50 border border-rose-200"
+                              : "bg-surface/30 border border-transparent"
+                          }`}
                         >
-                          <span
-                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-bold ${
-                              isCorrectAnswer
-                                ? "bg-secondary text-white"
-                                : isStudentAnswer
-                                ? "bg-danger text-white"
-                                : "bg-surface text-text-muted"
-                            }`}
-                          >
-                            {String.fromCharCode(65 + i)}
-                          </span>
-                          <span className="flex-1 text-sm text-text-primary">
-                            {option}
-                          </span>
-                          {isCorrectAnswer && (
-                            <CheckCircle2 className="h-4 w-4 shrink-0 text-secondary" />
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-bold ${
+                                isCorrect
+                                  ? "bg-emerald-500 text-white"
+                                  : isSelected
+                                  ? "bg-rose-500 text-white"
+                                  : "bg-surface text-text-muted"
+                              }`}
+                            >
+                              {String.fromCharCode(65 + j)}
+                            </span>
+                            <span
+                              className={`${
+                                isCorrect
+                                  ? "text-emerald-700 font-medium"
+                                  : isSelected
+                                  ? "text-rose-700"
+                                  : "text-text-primary"
+                              }`}
+                            >
+                              {option}
+                            </span>
+                          </div>
+                          {isCorrect && (
+                            <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                              Correct
+                            </span>
                           )}
-                          {isStudentAnswer && !isCorrectAnswer && (
-                            <XCircle className="h-4 w-4 shrink-0 text-danger" />
+                          {isSelected && !isCorrect && (
+                            <span className="text-xs font-semibold text-rose-600 bg-rose-100 px-2 py-0.5 rounded-full">
+                              Your Answer
+                            </span>
                           )}
                         </div>
                       );
                     })}
                   </div>
 
-                  {!currentQ.isUnattempted && (
-                    <p className="mt-3 text-xs text-text-muted">
-                      Your answer:{" "}
-                      <span
-                        className={
-                          currentQ.isCorrect ? "text-secondary" : "text-danger"
-                        }
-                      >
-                        {String.fromCharCode(65 + currentQ.selectedAnswer)} -{" "}
-                        {currentQ.options[currentQ.selectedAnswer]}
-                      </span>
-                    </p>
-                  )}
-
-                  {currentQ.explanation && (
-                    <div className="mt-4 rounded-xl bg-primary/5 p-4">
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-primary" />
-                        <span className="text-xs font-semibold text-primary">
-                          Explanation
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm leading-relaxed text-text-secondary">
-                        {currentQ.explanation}
+                  {q.explanation && (
+                    <div className="ml-8 mt-3 rounded-xl bg-emerald-50/50 border border-emerald-100 px-4 py-3">
+                      <p className="text-sm text-text-secondary">
+                        <span className="font-semibold text-emerald-700">Explanation: </span>
+                        {q.explanation}
                       </p>
                     </div>
                   )}
-
-                  <div className="mt-4 flex items-center justify-between">
-                    <button
-                      onClick={() =>
-                        setCurrentReviewIndex((prev) => Math.max(0, prev - 1))
-                      }
-                      disabled={currentReviewIndex === 0}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-border px-4 py-2 text-xs font-medium text-text-secondary transition-all hover:bg-surface-hover disabled:opacity-40"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                      Previous
-                    </button>
-                    <span className="text-xs text-text-muted">
-                      {currentReviewIndex + 1} of {filteredQuestions.length}
-                    </span>
-                    <button
-                      onClick={() =>
-                        setCurrentReviewIndex((prev) =>
-                          Math.min(filteredQuestions.length - 1, prev + 1)
-                        )
-                      }
-                      disabled={
-                        currentReviewIndex === filteredQuestions.length - 1
-                      }
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-border px-4 py-2 text-xs font-medium text-text-secondary transition-all hover:bg-surface-hover disabled:opacity-40"
-                    >
-                      Next
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
                 </motion.div>
-              )}
-            </>
+              ))}
+            </div>
           )}
         </motion.div>
 
