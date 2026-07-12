@@ -13,7 +13,7 @@ export const quizFiltersSchema = z.object({
 });
 
 export const quizSubmissionSchema = z.object({
-  answers: z.array(z.number().int().min(0).max(3)).min(1),
+  answers: z.array(z.number().int().min(-1).max(3)),
   timeTaken: z.number().int().min(0).max(7200),
 });
 
