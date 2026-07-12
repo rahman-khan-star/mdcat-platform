@@ -62,22 +62,14 @@ export default function QuizCard({
           </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-4 text-xs text-text-muted">
-          <span className="flex items-center gap-1.5">
-            <HelpCircle className="h-3.5 w-3.5" />
-            {quiz.questionCount} questions
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5" />
-            {quiz.duration} min
-          </span>
-          {quiz.attempts > 0 && (
+        {quiz.attempts > 0 && (
+          <div className="mt-4 flex items-center gap-4 text-xs text-text-muted">
             <span className="flex items-center gap-1.5">
               <BarChart3 className="h-3.5 w-3.5" />
               {quiz.attempts} attempt{quiz.attempts > 1 ? "s" : ""}
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {quiz.attempted && quiz.score !== undefined && (
           <div className="mt-4 rounded-xl bg-surface p-3">
