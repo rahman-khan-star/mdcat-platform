@@ -58,13 +58,42 @@ export async function POST(request: NextRequest) {
       return errorResponse("title, board, exam_type, and year are required", 400);
     }
 
+    if (typeof title !== "string" || title.length > 300) {
+      return errorResponse("Invalid title", 400);
+    }
+
+    if (typeof board !== "string" || board.length > 100) {
+      return errorResponse("Invalid board", 400);
+    }
+
+    if (typeof exam_type !== "string" || exam_type.length > 100) {
+      return errorResponse("Invalid exam_type", 400);
+    }
+
+    const yearNum = Number(year);
+    if (!yearNum || yearNum < 1900 || yearNum > new Date().getFullYear() + 1) {
+      return errorResponse("Invalid year", 400);
+    }
+
+    // Validate file_url if provided
+    if (file_url && typeof file_url === "string") {
+      try {
+        const url = new URL(file_url);
+        if (!["http:", "https:"].includes(url.protocol)) {
+          return errorResponse("Invalid file URL protocol", 400);
+        }
+      } catch {
+        return errorResponse("Invalid file URL format", 400);
+      }
+    }
+
     const { data, error } = await supabase
       .from("past_papers")
       .insert({
         title: String(title).slice(0, 300),
         board: String(board).slice(0, 100),
         exam_type: String(exam_type).slice(0, 100),
-        year: Number(year),
+        year: yearNum,
         subject: String(subject || "").slice(0, 100),
         description: String(description || "").slice(0, 1000),
         file_url: String(file_url || "").slice(0, 500),

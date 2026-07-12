@@ -6,6 +6,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const supabase = await createClient();
     const { id } = await params;
 
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return Response.json({ success: false, error: "Invalid paper ID" }, { status: 400 });
+    }
+
     const { data: paper, error: fetchError } = await supabase
       .from("past_papers")
       .select("download_count")
@@ -23,7 +29,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .eq("id", id);
 
     if (updateError) {
-      return Response.json({ success: false, error: "Failed to update count" }, { status: 500 });
+      return Response.json({ success: false, error: "Failed to track download" }, { status: 500 });
     }
 
     return Response.json({ success: true });

@@ -4,6 +4,16 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { AppError } from "@/lib/errors";
 import * as XLSX from "xlsx";
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_ROWS = 500;
+const ALLOWED_EXTENSIONS = [".csv", ".xlsx", ".xls"];
+const ALLOWED_MIME_TYPES = [
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "text/plain",
+];
+
 export async function POST(request: NextRequest) {
   try {
     const { supabase } = await requireAdmin();
@@ -14,12 +24,38 @@ export async function POST(request: NextRequest) {
     if (!file) return errorResponse("No file provided", 400);
     if (!quizId) return errorResponse("quiz_id is required", 400);
 
+    // Validate quiz_id is a valid UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(quizId)) {
+      return errorResponse("Invalid quiz_id format", 400);
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      return errorResponse(`File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`, 400);
+    }
+
+    // Validate file extension
+    const fileName = file.name.toLowerCase();
+    const hasValidExtension = ALLOWED_EXTENSIONS.some((ext) => fileName.endsWith(ext));
+    if (!hasValidExtension) {
+      return errorResponse(`Invalid file type. Allowed: ${ALLOWED_EXTENSIONS.join(", ")}`, 400);
+    }
+
+    // Validate MIME type
+    if (file.type && !ALLOWED_MIME_TYPES.includes(file.type) && !file.type.startsWith("text/")) {
+      return errorResponse("Invalid file MIME type", 400);
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
     const workbook = XLSX.read(buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
     if (rows.length === 0) return errorResponse("File is empty", 400);
+    if (rows.length > MAX_ROWS) {
+      return errorResponse(`Too many rows. Maximum is ${MAX_ROWS} questions per upload`, 400);
+    }
 
     const questions: Array<{
       quiz_id: string;
@@ -68,7 +104,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (questions.length === 0 && errors.length > 0) {
-      return errorResponse(`No valid questions found. Errors: ${errors.map((e) => `Row ${e.row}: ${e.message}`).join("; ")}`, 400);
+      return errorResponse(`No valid questions found. First error: Row ${errors[0].row}: ${errors[0].message}`, 400);
+    }
+
+    // Verify quiz exists and is accessible
+    const { data: quiz, error: quizError } = await supabase
+      .from("quizzes")
+      .select("id")
+      .eq("id", quizId)
+      .single();
+
+    if (quizError || !quiz) {
+      return errorResponse("Quiz not found", 404);
     }
 
     const { data, error } = await supabase
@@ -90,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     return successResponse({
       imported: data?.length ?? 0,
-      errors,
+      errors: errors.slice(0, 10), // Limit error output
       total_rows: rows.length,
     }, `${data?.length ?? 0} questions imported successfully`);
   } catch (error) {

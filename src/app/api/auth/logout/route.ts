@@ -8,7 +8,7 @@ export async function POST() {
 
     if (error) {
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: "Failed to log out" },
         { status: 500 }
       );
     }
