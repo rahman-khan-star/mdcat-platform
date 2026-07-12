@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { securityLog, logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
+  const requestId = request.headers.get("x-request-id") || "unknown";
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || "unknown";
+
   try {
     const { email, password, fullName } = await request.json();
 
@@ -20,6 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (typeof password !== "string" || password.length < 8) {
+      securityLog.failedSignup(email, ip, "weak password", requestId);
       return NextResponse.json(
         { success: false, error: "Password must be at least 8 characters" },
         { status: 400 }
@@ -47,11 +54,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
+      securityLog.failedSignup(email, ip, error.message, requestId);
       return NextResponse.json(
         { success: false, error: "Could not create account" },
         { status: 400 }
       );
     }
+
+    logger.info("auth.signup.success", { userId: data.user?.id }, { ip, requestId });
 
     return NextResponse.json({
       success: true,

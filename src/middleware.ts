@@ -1,16 +1,18 @@
 import { updateSession } from "@/lib/supabase/middleware";
 import { NextResponse, type NextRequest } from "next/server";
+import { securityLog } from "@/lib/logger";
 
 const protectedRoutes = ["/dashboard", "/profile", "/quiz"];
 const authRoutes = ["/login", "/signup", "/forgot-password", "/reset-password"];
 const adminRoutes = ["/admin"];
 
-// Simple in-memory rate limiter for auth endpoints
+// Simple in-memory rate limiter
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX = 10; // max requests per window
+const RATE_LIMIT_MAX_AUTH = 10;
+const RATE_LIMIT_MAX_ADMIN = 30;
 
-function checkRateLimit(key: string): boolean {
+function checkRateLimit(key: string, max: number): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(key);
 
@@ -19,7 +21,7 @@ function checkRateLimit(key: string): boolean {
     return true;
   }
 
-  if (entry.count >= RATE_LIMIT_MAX) {
+  if (entry.count >= max) {
     return false;
   }
 
@@ -27,7 +29,6 @@ function checkRateLimit(key: string): boolean {
   return true;
 }
 
-// Cleanup old entries periodically
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of rateLimitMap) {
@@ -36,6 +37,10 @@ setInterval(() => {
     }
   }
 }, 60 * 1000);
+
+function generateRequestId(): string {
+  return crypto.randomUUID().slice(0, 8);
+}
 
 function hasValidCsrfOrigin(request: NextRequest): boolean {
   const method = request.method;
@@ -55,7 +60,14 @@ function hasValidCsrfOrigin(request: NextRequest): boolean {
 }
 
 export async function middleware(request: NextRequest) {
+  const requestId = generateRequestId();
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || "unknown";
+
+  // CSRF protection
   if (!hasValidCsrfOrigin(request)) {
+    securityLog.csrfViolation(ip, request.nextUrl.pathname, requestId);
     return NextResponse.json(
       { success: false, error: "Invalid request origin" },
       { status: 403 }
@@ -66,9 +78,21 @@ export async function middleware(request: NextRequest) {
 
   // Rate limit auth endpoints
   if (pathname.startsWith("/api/auth/login") || pathname.startsWith("/api/auth/signup")) {
-    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown";
     const rateKey = `auth:${ip}:${pathname}`;
-    if (!checkRateLimit(rateKey)) {
+    if (!checkRateLimit(rateKey, RATE_LIMIT_MAX_AUTH)) {
+      securityLog.rateLimitHit(ip, pathname, requestId);
+      return NextResponse.json(
+        { success: false, error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+  }
+
+  // Rate limit admin API endpoints
+  if (pathname.startsWith("/api/admin")) {
+    const rateKey = `admin:${ip}`;
+    if (!checkRateLimit(rateKey, RATE_LIMIT_MAX_ADMIN)) {
+      securityLog.rateLimitHit(ip, pathname, requestId);
       return NextResponse.json(
         { success: false, error: "Too many requests. Please try again later." },
         { status: 429 }
@@ -77,6 +101,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const supabaseResponse = await updateSession(request);
+
+  // Add request ID header to response
+  supabaseResponse.headers.set("X-Request-ID", requestId);
 
   if (pathname.startsWith("/auth/callback")) {
     return supabaseResponse;
@@ -99,6 +126,9 @@ export async function middleware(request: NextRequest) {
   );
 
   if ((isProtected || isAdminRoute) && !hasSession) {
+    if (isAdminRoute) {
+      securityLog.unauthorizedAccess(pathname, ip, "no session", requestId);
+    }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);

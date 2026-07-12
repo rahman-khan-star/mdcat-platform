@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { securityLog } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
+  const requestId = request.headers.get("x-request-id") || "unknown";
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || "unknown";
+
   try {
     const { email, password } = await request.json();
 
@@ -20,6 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (typeof password !== "string" || password.length < 6) {
+      securityLog.failedLogin(email, ip, "invalid password format", requestId);
       return NextResponse.json(
         { success: false, error: "Invalid credentials" },
         { status: 400 }
@@ -33,11 +40,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
+      securityLog.failedLogin(email, ip, error.message, requestId);
       return NextResponse.json(
         { success: false, error: "Invalid email or password" },
         { status: 401 }
       );
     }
+
+    securityLog.successfulLogin(data.user.id, ip, requestId);
 
     return NextResponse.json({
       success: true,
@@ -50,6 +60,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch {
+    securityLog.failedLogin("unknown", ip, "server error", requestId);
     return NextResponse.json(
       { success: false, error: "An error occurred" },
       { status: 500 }
