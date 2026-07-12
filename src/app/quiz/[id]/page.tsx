@@ -102,7 +102,6 @@ export default function QuizPage() {
           JSON.stringify({
             ...result,
             answers: answerArray,
-            questions: questions,
           })
         );
         router.push(`/results?quizId=${quizId}`);
